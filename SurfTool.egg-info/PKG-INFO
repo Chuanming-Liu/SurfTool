@@ -1,0 +1,14 @@
+Metadata-Version: 1.2
+Name: SurfTool
+Version: 0.0.1
+Summary: Surface wave  tool
+Home-page: https://github.com/Chuanming-Liu
+Author: Chuanming Liu
+Author-email: chuanming.liu@colorado.edu
+License: MIT
+Description: UNKNOWN
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6, <4

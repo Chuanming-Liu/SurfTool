@@ -1,0 +1,8 @@
+README.md
+setup.py
+SurfTool.egg-info/PKG-INFO
+SurfTool.egg-info/SOURCES.txt
+SurfTool.egg-info/dependency_links.txt
+SurfTool.egg-info/requires.txt
+SurfTool.egg-info/top_level.txt
+surftool/__init__.py
