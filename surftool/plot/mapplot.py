@@ -250,6 +250,20 @@ def diff_mesh_kwargs(var_nm, normal=True, _abs=True, diff_helm=False):
         pdb.set_trace('unknow var_nm')
     return kwargs, sigma_kwargs
 
+
+# mesh plot of ratios
+def ratio_mesh_kwargs(var_nm):
+    kwargs = {'ndecimal': 0}
+    if var_nm == 'A_2':
+        kwargs.update({
+        'cmap': 'hot_r',
+        'xmax':10, 'xmin': 0, 
+        'nbins': 12, # for hist
+        'n': 6, # for meshplot
+        'levels': [0, 1, 3, 5, 7, 9], 
+        })
+    return kwargs
+
 def avg_mesh_kwargs(var_nm):
     kwargs = {'ndecimal': 0}
     if var_nm == 'A_1':
@@ -279,8 +293,6 @@ def avg_mesh_kwargs(var_nm):
     else: 
         pdb.set_trace('unknow var_nm')
     return kwargs
-
-
 
 def upscale_sigma(tomoh5, per, **kwargs):
     """
@@ -374,28 +386,27 @@ class plot_basemap(object):
         bar_color = kwargs.get('bar_color', 'red')
         dlon = kwargs.get('dlon', 0.2)
         stackid = kwargs.get('stackid', 0)
+        plot_hist = kwargs.get('plot_hist', False)
         
         slab_contour = kwargs.get('slab_contour', False)
         text_basin = kwargs.get('mark_basin', False)
         text_pattern = kwargs.get('text_pattern', False)
 
+        paper = kwargs.get('paper', False)
+
         z = tomoh5.get_var(per=per, nms=[var_nm], **kwargs)[0]
         ax.set_rasterized(True)
 
-
         if mask_fig:
             mask = tomoh5.get_mask(per=per, var=var_nm, **kwargs)
+            if custom_mask: 
+                with open(fmask, 'rb') as f: 
+                    mark_pre = pickle.load(f)
+                mask |= mark_pre
         else:
             mask = np.full(z.shape, False)
 
-
-        if custom_mask: 
-            with open(fmask, 'rb') as f: 
-                mark_pre = pickle.load(f)
-            mask |= mark_pre
-
         # sigma upscale
-
         if var_nm in ['sigma_psi_2', 'vel_sem', 'sigma_A_0', 'sigma_A_2' ] and upscale:
             if var_nm == 'sigma_A_0':
                 kwargs['ups_a0'] = True
@@ -415,31 +426,45 @@ class plot_basemap(object):
         x, y = tomoh5.lon_grd, tomoh5.lat_grd
         z = np.ma.array(z, mask=mask)
 
-        # if per == 85:
-        #     pdb.set_trace()
-        # plot basemap
+
+        # plot c-map
+        kwargs_mesh = VAR2PARAM[var_nm].kwargs_mesh
+
+        # plot histgrams
+        if plot_hist:
+            self.hist_plot(ax=ax, para=z, xlabel=f'{var_nm}', **{**kwargs, **kwargs_mesh})
+            return 
+
+
         kwargs['depth'] = T2dep_slab(per)
         if bmap is None:
             bmap = self.plot_basemap_base(ax, **kwargs)
 
-        # plot c-map
-        kwargs_mesh = VAR2PARAM[var_nm].kwargs_mesh
 
         if var_nm in ['vel_iso', 'A_0']:
             levels = get_levels(region, wtype, per)
             # kwargs_mesh['cmap'] = 'epsl'  # 'cv'
             kwargs_mesh['levels'] = levels
-
             if perturbation:
                 kwargs_mesh['cmap'] = 'epsl' 
-                kwargs_mesh['levels'] = np.linspace(-3, 3., 9) # np.linspace(-4, 4, 5)
+                kwargs_mesh['levels'] = np.linspace(-3, 3., 7) # np.linspace(-4, 4, 5)
+
+
+        elif var_nm in ['sigma_A_0', 'vel_sem']:
+            levels = get_unc_levels(wtype, paper)
+            kwargs_mesh['levels'] = levels
+            kwargs_mesh['n'] = (len(levels)-1)*2
+
+        elif var_nm in ['sigma_A_2'] and paper:
+            levels = [0., 0.1, 0.2, 0.4, 0.5]
+            kwargs_mesh['levels'] = levels
+            kwargs_mesh['n'] = (len(levels)-1)*2
 
         if var_nm not in ['psi_2', 'psi_1']:
+            #-----------------------------------#
+            # plot maps
             kwargs_mesh = {**kwargs, **kwargs_mesh}
             imap = plt_mesh(bmap, x, y, z, **kwargs_mesh)
-
-            # if per > 50. and wtype == 'Ray':
-            #     plot_small_volcano(bmap)  
             if text_basin: 
                 mark_basin(bmap=bmap, ax=ax)
         else:
@@ -482,19 +507,93 @@ class plot_basemap(object):
 
             if slab_contour:
                 plt_slabcontour(bmap, **kwargs)
-            
 
             imap = plt_quiver(
             bmap, x, y, amplitude=amp, azimuth=z, ax=ax, step=step,
             headaxislength=headaxislength, headlength=headlength,
             scale=scale, color=bar_color, kwargs_key=kwargs_key, **quiver_kwargs)
             # imap = (im, cm, norm)
-
-            # if text_pattern:
-                # mark_pattern(bmap, ax, per)
-                # mark_basin(bmap=bmap, ax=ax)      
+   
 
         return imap, bmap
+
+
+
+    def interface_two_ratio(self, ax, tomoh5=None, per=None, bmap=None, var_nms=['A_2', 'sigma_A_2'],
+        perturbation=False, **kwargs):
+        """
+        parameters
+        -----
+        ax :: ax of matplotlib
+        tomoh5 :: h5 object of tomo
+        per :: period (int)
+        var_nam :: variable name
+        """
+        custom_mask = kwargs.get('custom_mask', False)
+        fmask = kwargs.get('fmask')
+        region = kwargs.get('region', 'AA')
+        wtype = kwargs.get('wtype', 'Ray')
+        upscale = kwargs.get('upscale', True)
+        anios_space = kwargs.get('anios_space', 2.8)
+        azi_scale = kwargs.get('azi_scale', 50) # smaller, longer
+        maprange = kwargs.get('maprange', 'Ray')
+        smooth = kwargs.get('smooth', True)
+        mask_fig = kwargs.get('mask_fig', True)
+        map_key = kwargs.get('map_key', 'all')
+        bar_color = kwargs.get('bar_color', 'red')
+        dlon = kwargs.get('dlon', 0.2)
+        stackid = kwargs.get('stackid', 0)
+        plot_hist = kwargs.get('plot_hist', False)
+        
+        slab_contour = kwargs.get('slab_contour', False)
+        text_basin = kwargs.get('mark_basin', False)
+        text_pattern = kwargs.get('text_pattern', False)
+
+        z1 = tomoh5.get_var(per=per, nms=[var_nms[0]], **kwargs)[0]
+        z2 = tomoh5.get_var(per=per, nms=[var_nms[1]], **kwargs)[0]
+        # mask = tomoh5.get_mask(per=per, var=var_nms[0], **kwargs)
+
+        mask = np.full(z1.shape, False)
+        if custom_mask: 
+            with open(fmask, 'rb') as f: 
+                mark_pre = pickle.load(f)
+            mask |= mark_pre
+
+        # sigma upscale
+        if var_nms[1] in ['sigma_psi_2', 'vel_sem', 'sigma_A_0', 'sigma_A_2' ] and upscale:
+            lamb = upscale_sigma(tomoh5, per, **kwargs)
+            z2 *= lamb
+
+        z = z1/z2
+
+        if smooth: 
+            z = np.ma.array(z, mask=mask, fill_value=np.nan)
+            sigma = 0.1
+            std = sigma / tomoh5.dlon
+            z = gaussian_filter(z, x_stddev=std)
+
+        x, y = tomoh5.lon_grd, tomoh5.lat_grd
+        # z = np.ma.array(z, mask=mask)
+
+        # plot c-map
+        kwargs_ratio = ratio_mesh_kwargs(var_nm=var_nms[0])
+
+        xlabel = f'{var_nms[0]} /sigma'
+        # plot histgrams
+        if plot_hist:
+            self.hist_plot(ax=ax, para=z, xlabel=xlabel, **{**kwargs, **kwargs_ratio})
+            return 
+
+        # plot maps
+        kwargs['depth'] = T2dep_slab(per)
+
+        bmap = self.plot_basemap_base(ax, **kwargs)
+        kwargs_mesh = {**kwargs, **kwargs_ratio}
+        ax.set_rasterized(True)
+        imap = plt_mesh(bmap, x, y, z, **kwargs_mesh)
+
+        return imap, bmap
+
 
     def interface_AziCov(self, ax, tomoh5=None, per=None, bmap=None, **kwargs):
         """ 
@@ -778,7 +877,6 @@ class plot_basemap(object):
             ax.axvline(0, c='k', lw=0.5, ls='--')
             # title = f'{mean:.{ndecimal+1}f} $\pm$ {std:.{ndecimal+1}f} {unit}'
 
-
             ax.set_xticks(levels)
             ax.tick_params(axis='x', length=0)
             # minor_ticks = levels
@@ -788,7 +886,6 @@ class plot_basemap(object):
                 xlim[0] = 0
             ax.set_xlim(*xlim)
             
-
             if ylim is None:
                 ylim = ax.get_ylim()
 
@@ -827,6 +924,92 @@ class plot_basemap(object):
         else: 
             return mean, std, sigma_mean
 
+    def hist_plot(self, ax=None, para=None, **kwargs):
+
+        #--- histgram ---#
+        xmin = kwargs.get('xmin')
+        xmax = kwargs.get('xmax')
+        nbins = kwargs.get('nbins')
+        levels = kwargs.get('levels')
+        ylim_max = kwargs.get('ymax_hist', None)
+        unit = kwargs.get('unit', '')
+        xlabel = kwargs.get('label', '')
+        key_abs = kwargs.get('abs', '')
+
+
+        xlim = [xmin, xmax]
+        bins = np.linspace(*xlim, nbins+1)
+        para = para[~np.isnan(para)]
+        para = para[np.abs(para)<xmax]
+        weights = np.ones(para.size)/para.size * 100.
+        gauss_fit =True
+
+        # fit the gaussian distribution
+        try: 
+            popt, bin_centers, hist, hist_fit = fit_dist(para, bins=bins, weights=weights)
+            if gauss_fit:
+                mean, std = popt[1:3]
+        except RuntimeError:
+            gauss_fit = False 
+        
+
+        kwargs_hist = {
+            'edgecolor': 'k',
+            'alpha': 0.5, 
+            'bins': bins,
+            'weights': weights 
+        }
+
+        ax.hist(para, **kwargs_hist)
+        if gauss_fit: 
+            x_interp = np.linspace(-xmax, xmax, 10*nbins)
+            y_interp = _normal(x_interp, *popt)
+            ax.plot(x_interp, y_interp, lw=2, alpha=0.8)
+        ax.axvline(0, c='k', lw=0.5, ls='--')
+        # title = f'{mean:.{ndecimal+1}f} $\pm$ {std:.{ndecimal+1}f} {unit}'
+
+        ax.set_xticks(levels)
+        ax.tick_params(axis='x', length=0)
+        # minor_ticks = levels
+        # ax.set_xticks(minor_ticks[::2], minor=True)
+
+        ax.set_xlim(*xlim)
+        
+        if ylim_max is None:
+            ylim = ax.get_ylim()
+        else:
+            ylim = [0, ylim_max]
+
+        if ylim[1]>50:
+            yticks_major = 10
+            yticks_minor = 2
+        else:
+            yticks_major = 5
+            yticks_minor = 1
+        ax.set_yticks(np.arange(0, 100, yticks_major))
+        ax.set_yticks(np.arange(0, 100, yticks_minor), minor=True)
+
+        ax.set_ylim(*ylim)
+
+        ax.set_xlabel(xlabel)
+        if kwargs.get('ylabel', True): 
+            ax.set_ylabel('Percentage (%)')
+        else:
+            ax.axes.yaxis.set_ticklabels([])
+
+        ax.tick_params(which='major', direction='in')
+        ax.tick_params(which='minor', direction='in')
+        # ax.yaxis.set_label_position('right')
+        # ax.yaxis.tick_right()
+
+        _txt = '\n'.join([
+            fr'Mean: {mean:.1f} {unit}',
+            fr'SD: {std:.1f} {unit}',
+            # fr'$\langle \delta c \rangle = {sigma_mean:.0f}$ m/s',
+        ])
+        ax.text(.6, .85, f'{_txt}', fontsize=8, transform=ax.transAxes)
+        return 
+
     def stat_diff_vs_T(self, axes=None, tomo1=None, tomo2=None, pers=None, **kwargs):
         """
         three rows normalized plot (0: mean_diff; 1: N_std; 2: mean_sigma)
@@ -840,9 +1023,9 @@ class plot_basemap(object):
         plot_std = kwargs.get('plot_std', True)
         plot_sigma = kwargs.get('plot_sigma', True)
         ups_a0 = kwargs.get('ups_a0', False)
+        upscale = kwargs.get('upscale', True)
         var_nm = kwargs.get('var_nm')
         wtype = kwargs.get('wtype', 'Ray')
-
 
         for per in pers:
             _mean, _std, _sigma_mean = self.interface_diff(tomo1=tomo1, tomo2=tomo2, per=per, **diff_kwargs)
@@ -868,17 +1051,20 @@ class plot_basemap(object):
                     ax.plot(pers, mean, c='tab:blue', **kwargs_plt)
 
                 ax.axhline(0, c='k', lw=0.5, alpha=.5, ls=':')
-                ax_id += 1
+                ax_id += 1 
 
             if plot_std:
-                if var_nm == 'A_0':
+                if var_nm in ['A_0', 'vel_iso']:
                     color = 'green'
-                    if ups_a0:    
+                    if (wtype=='Ray' and ups_a0) or (wtype=='Lov' and upscale):    
                         color = 'tab:orange'
                 else:
                     color = 'tab:orange'
+                # if wtype == 'Lov':
+                #     pdb.set_trace()
+
                 axes[ax_id].plot(pers, std, c=color, **kwargs_plt)
-                # axes[1].axhline(1, c='k', lw=.5, alpha=.5)
+                axes[ax_id].axhline(1, c='k', lw=.6, alpha=.75, ls=':')
                 ax_id += 1
                 
             if plot_sigma:
@@ -890,7 +1076,6 @@ class plot_basemap(object):
         # ax.grid(axis='y', ls='--')
         # if fig is not None: fig.savefig(f'{fout}.pdf')
         return 
-
 
     def stat_avg(self, tomo=None, per=None, var_nm='', ax=None,  smooth=True, **kwargs):
         """
@@ -1016,7 +1201,6 @@ class plot_basemap(object):
 
 
         return mean, std
-
 
     def stat_vs_T(self, ax=None, tomo=None, var_nm=None, pers=None, **kwargs):
         """
@@ -1725,7 +1909,6 @@ def map_sta_setting(**kwargs):
 
     return param
 
-
 # --------------#
 def get_levels(region, wtype, per):
     if wtype=='Ray':
@@ -1735,6 +1918,16 @@ def get_levels(region, wtype, per):
         levels  = vrange.LEVELS_C_AA_Ray.get(int(per))
     else:
         levels  = vrange.LEVELS_C_AK_Lov.get(int(per))
+    return levels
+
+def get_unc_levels(wtype, paper=False):
+    if wtype == 'Ray':
+        levels = [0, 5, 10, 15, 20, 25]
+    else: 
+        levels = [0, 10, 20, 30, 40]
+
+    if paper: 
+        levels = [0, 5, 10, 15, 20]
     return levels
         
 # --------------#    
@@ -1882,7 +2075,6 @@ def plt_map(ax, **kwargs):
 # --------------#
 # plot geological features
 # --------------#
-
 def _plt_coast(m, coasts, lw_coastline=1.):
     """
     replot coast line without rivers
@@ -2049,7 +2241,6 @@ def plot_Yakutat(m, bmap=True, **kwargs):
     lkwargs = {'lw': 2, 'color': 'black' }
     x, y = np.loadtxt(ftxt, unpack=True)
     m.plot(x, y, latlon=True,  alpha=alpha, **lkwargs)
-
     
 def mark_basin(bmap, ax, **kwargs):
     wtype = kwargs.get('wtype')
@@ -2100,7 +2291,6 @@ def mark_pattern(bmap, ax, per, **kwargs):
 
         ax.annotate(txt, xy=(x1, y1), xytext=(x2, y2), arrowprops=dict(facecolor='black', shrink=0.1, width=1., headlength=5, headwidth=2.3), alpha=1)
     return 
-
 
 def plt_slabcontour(bmap, **kwargs):
     """
@@ -2320,7 +2510,6 @@ def plt_wedge_diagram(ax, mapx, mapy, histArr, **kwargs):
     # cbar = plt.colorbar(sm, pad=0.1)
     return 
 
-
 # --------------#
 # color map #
 # --------------#
@@ -2387,11 +2576,12 @@ def plt_colorbar(bmap, cm, im=None, norm=None, **kwargs):
         # https://stackoverflow.com/a/22533565/8877268
         sm = plt.cm.ScalarMappable(cmap=cm)
         sm._A = []
-        cb = bmap.colorbar(sm, location='bottom', pad=pad, shrink=0.5)
+        cb = bmap.colorbar(sm, location='bottom', pad=pad, shrink=0.5, extend=kwargs.get('extend_colorbar', 'neither'))
         cb.set_ticks(norm.normed)
         cb.set_ticklabels([f'{level:.{ndecimal}f}' for level in norm.levels])
+
     else:
-        cb = bmap.colorbar(im, 'bottom', pad=pad)
+        cb = bmap.colorbar(im, 'bottom', pad=pad, extend=kwargs.get('extend_colorbar', 'neither'))
     cb.set_label(label, fontsize=fontsize)
 
     return cb
@@ -2414,7 +2604,7 @@ def add_colorbar(fig, cmap, norm, rect=[0.25, 0.05, 0.5, 0.02], ndecimal=2, labe
     cax = fig.add_axes(rect)
     sm = plt.cm.ScalarMappable(cmap=cmap)
     sm._A = []
-    cb = fig.colorbar(sm, cax=cax, orientation=orientation)
+    cb = fig.colorbar(sm, cax=cax, orientation=orientation, extend=kwargs.get('extend_colorbar', 'neither'))
     cb.set_ticks(norm.normed)
     cb.set_ticklabels([f'{level:.{ndecimal}f}' for level in norm.levels])
     # mute

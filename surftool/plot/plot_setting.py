@@ -24,7 +24,6 @@ class VarParam(object):
             diff['ndecimal'] = kwargs_mesh['ndecimal']
 
 VAR2PARAM = {
-
     # isotropic c 
     'vel_iso': VarParam(
         name='vel_iso',
@@ -43,8 +42,8 @@ VAR2PARAM = {
         unit='m/s', 
         factor=1000,
         kwargs_mesh={'cmap': 'afmhot_r', 'ndecimal': 0, 'name': 'Phase speed uncertainty', 'label': 'Phase speed uncertainty (m/s)',
-            'levels': [0, 5, 10, 20, 30, 40],
-            'n': 10,
+            'levels': [0, 10, 20, 30, 40],
+            'n': 8,
             # 'cmap': 'hot',
             # 'levels': np.arange(0, 550, 50),
             # 'levels': [0, 5, 10, 15, 20, 25],
@@ -60,9 +59,11 @@ VAR2PARAM = {
     'num_ev_qc': VarParam(
         name='num_ev_qc', unit='#',
         kwargs_mesh={'name': 'No. of events', 'cmap': 'YlGnBu',
-                     # 'levels': np.linspace(0, 40, 5)**2, 'n': 8,
-                     'levels': np.arange(0, 1000, 200), 'n': 10,
-                     'ndecimal': 0},
+                     'levels': np.linspace(0, 2500, 6), 'n': 10,
+                    #  'levels': np.linspace(0, 1000, 6), 'n': 10,
+                     'ndecimal': 0,
+                     'label': 'Raypath density',
+                     },
         ),
 
     # A0 
@@ -78,7 +79,7 @@ VAR2PARAM = {
     # c: 'hot_r'
     'sigma_A_0': VarParam(
         name='sigma_A_0', unit='m/s', mask='mask_ani', factor=1000,
-        kwargs_mesh={'name': r'$\sigma_{A_0}$', 'label': 'Phase speed uncertainty (m/s)', 'cmap': 'afmhot_r', 'levels': [0, 5, 10, 20, 30, 40], 'n': 10, 'ndecimal': 0},
+        kwargs_mesh={'name': r'$\sigma_{A_0}$', 'label': 'Phase speed uncertainty (m/s)', 'cmap': 'afmhot_r', 'levels': [0, 10, 20, 30, 40], 'n': 8, 'ndecimal': 0},
         ),
 
     # A2
@@ -113,6 +114,7 @@ VAR2PARAM = {
                      'levels': [0., 0.2, 0.4, 0.6, 0.8, 1], 
                      'ndecimal': 1,
                      'n': 10,
+                     'label': 'Amplitude uncertainty (%)',
                      }
         ),
 
@@ -188,7 +190,15 @@ VAR2PARAM = {
 
     'misfit': VarParam(
         name='misfit', unit='',
-        kwargs_mesh={'ndecimal': 1, 'name': r'$\chi_\nu$', 'cmap': 'Reds', 'levels': [0, 1, 2, 3, 4, 5], 'n': 5,'label':'Misfit','ndecimal': 0}, # 'reverse':True
+        kwargs_mesh={'ndecimal': 1, 'name': r'$\chi_\nu$', 'cmap': 'Reds', 
+        'levels': [0, 1, 2, 3, 4, 5], 
+        'n': 5, # continuous
+        'label':'Misfit',
+        'xmin': 0, 
+        'xmax': 5,
+        'ymax_hist': 30.,
+        'nbins': 20,
+        'ndecimal': 0}, # 'reverse':True
     ),
 
     'histArr': VarParam(name='histArr'),
