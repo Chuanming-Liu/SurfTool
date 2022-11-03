@@ -1809,7 +1809,6 @@ def map_AA_setting(**kwargs):
 def map_slab_setting(**kwargs):
 
     param = {
-
         'minlo': -165.+360.,
         'maxlo': -142+360.,
         'minla': 53.2,
@@ -1821,7 +1820,6 @@ def map_slab_setting(**kwargs):
         # for ploting parallels and meridians
         'bxa': 5,
         'bya': 2.,
-
 
         'resolution': 'i',  # c, l, i, h, f, for boundary
         'lw_coastline': 0.8,
