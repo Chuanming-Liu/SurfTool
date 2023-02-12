@@ -1,6 +1,6 @@
 ### SurfTool
 
-SurfTool is a python package to do seismic data processing for both ambient noise and earthquake events. It contains functions includes: 
+SurfTool is a python package to apply surface wave data processing for both ambient noise and earthquake events dataset. It contains functions includes: 
 
 request seismic data from IRIS; 
 
